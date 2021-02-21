@@ -1,6 +1,5 @@
 #!/usr/bin/python
 
-import socket
 import time
 import requests
 from gpiozero import Button
@@ -9,16 +8,6 @@ from phue import Bridge
 from signal import pause
 
 button = Button(2)
-
-def is_connected():
-    try:
-        # connect to the host -- tells us if the host is actually
-        # reachable
-        socket.create_connection(("1.1.1.1", 53))
-        return True
-    except OSError:
-        pass
-    return False
 
 def ring_bell():
     bell = LED(22)
@@ -32,11 +21,14 @@ def telegram_bot_sendtext(bot_message):
     bot_token = '111111111:XXXXXXXXXXXXXXXXXXX'
     bot_chatID = '-123456789'
     send_text = 'https://api.telegram.org/bot' + bot_token + '/sendMessage?chat_id=' + bot_chatID + '&parse_mode=Markdown&text=' + bot_message
-
-    response = requests.get(send_text)
-
-    return response.json()    
-
+    
+    try:
+        response = requests.get(send_text)
+        return response.json()  
+    except OSError:
+        pass
+    return False
+      
 
 # set alert state
 def set_alert_state(lights, store_settings):
@@ -86,31 +78,27 @@ def blink_lights():
     lights = b.get_light_objects('id')
 
     store_settings = {}
-    count = 0
 
-    while count < 2:
-        for id in lights:
-            if lights[id].name in alert_lights:
-                state = {"on" : lights[id].on, 'hue': lights[id].hue, 'saturation': lights[id].saturation, 'brightness': lights[id].brightness}
+    for id in lights:
+        if lights[id].name in alert_lights:
+            state = {"on" : lights[id].on, 'hue': lights[id].hue, 'saturation': lights[id].saturation, 'brightness': lights[id].brightness}
 
-                if store_settings.get(id) is None:
-                    store_settings[id] = state
+            if store_settings.get(id) is None:
+                store_settings[id] = state
 
-        set_alert_state(lights, store_settings)
-                
-        # wait
-        time.sleep(0.01)
-        set_original_state(lights, store_settings)
-        count += 1
+    set_alert_state(lights, store_settings)
+
+    # wait
+    time.sleep(0.01)
+    set_original_state(lights, store_settings)
+
 
 # Run functions
 def ding_dong():    
     print("Button is pressed")
     ring_bell()
-    conn = is_connected()
-    if(conn):
-        telegram_bot_sendtext("DING DONG!")
-        blink_lights()
+    telegram_bot_sendtext("DING DONG!")
+    blink_lights()
 
 # Button press
 button.when_pressed = ding_dong
